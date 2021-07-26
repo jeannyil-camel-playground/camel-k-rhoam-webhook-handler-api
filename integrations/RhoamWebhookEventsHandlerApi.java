@@ -1,4 +1,4 @@
-// camel-k: language=java trait=prometheus.enabled=true trait=prometheus.service-monitor=false trait=3scale.enabled=true trait=tracing.auto=true resource=../resources/openapi.json
+// camel-k: language=java trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true resource=../resources/openapi.json
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
