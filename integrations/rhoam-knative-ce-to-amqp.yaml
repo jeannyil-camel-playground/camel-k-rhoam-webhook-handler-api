@@ -1,0 +1,19 @@
+# camel-k: language=yaml trait=prometheus.enabled=true trait=tracing.auto=true
+
+# Write your routes here, for example:
+- from:
+    uri: "timer:yaml"
+    parameters:
+      period: "1000"
+    steps:
+      - set-body:
+          constant: "Hello Camel K from yaml"
+      - to: "log:info"
+
+# TODO - Translate this a YAML DSL
+# .log(LoggingLevel.INFO, logName, ">>> ${routeId} - RHOAM Admin/Developer Portal received event: in.headers[${headers}] - in.body[${body}]")
+# .removeHeaders("*", "breadcrumbId")
+# .setHeader("RHOAM_EVENT_TYPE").xpath("//event/type", String.class)
+# .setHeader("RHOAM_EVENT_ACTION").xpath("//event/action", String.class)
+# .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending to RHOAM.WEBHOOK.EVENTS.QUEUE AMQP address...")
+# .to(ExchangePattern.InOnly, "amqp:queue:RHOAM.WEBHOOK.EVENTS.QUEUE")

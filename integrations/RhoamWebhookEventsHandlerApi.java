@@ -1,23 +1,30 @@
-// camel-k: language=java trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true resource=../resources/openapi.json
+// camel-k: language=java dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002 dependency=mvn:io.github.jeannyil:message-models:1.0.0 trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true resource=../resources/openapi.json
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.camel.CamelContext;
+import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
+import org.apache.camel.ExchangePattern;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.TypeConversionException;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.model.rest.RestBindingMode;
 import org.apache.camel.model.rest.RestParamType;
-import org.apache.camel.model.dataformat.JsonLibrary;
+
+import io.github.jeannyil.beans.ErrorMessageType;
+import io.github.jeannyil.beans.ResponseMessage;
 
 // Exposes the RHOAM Webhook Events Handler API
 public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 
-  public static final String DIRECT_GENERATE_ERROR_MESSAGE = "direct:generateErrorResponse";
-	public static final String DIRECT_SEND_TO_AMQP_QUEUE = "direct:sendToAMQPQueue";
-	public static final String DIRECT_PING_WEBHOOK = "direct:pingWebhook";
+  private static String logName = RhoamWebhookEventsHandlerApi.class.getName();
+
+  public static final String DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT = "direct:generateErrorResponse";
+	public static final String DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT = "direct:sendToAMQPQueue";
+	public static final String DIRECT_PING_WEBHOOK_ENDPOINT = "direct:pingWebhook";
+  public static final String KNATIVE_CE_RHOAM_EVENT_ENDPOINT = "knative:event/rhoam.event";
   
   @Override
   public void configure() throws Exception {
@@ -29,7 +36,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .handled(true)
       .maximumRedeliveries(0)
       .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught exception: ${exception.stacktrace}").id("log-unexpected")
-      .to(DIRECT_GENERATE_ERROR_MESSAGE).id("generate-500-errorresponse")
+      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT).id("generate-500-errorresponse")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-unexpected-response")
     ;
 
@@ -42,7 +49,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught TypeConversionException: ${exception.stacktrace}").id("log-400")
       .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(Response.Status.BAD_REQUEST.getStatusCode())) // 400 Http Code
       .setProperty(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.BAD_REQUEST.getReasonPhrase())) // 400 Http Code Text
-      .to(DIRECT_GENERATE_ERROR_MESSAGE).id("generate-400-errorresponse")
+      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT).id("generate-400-errorresponse")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log400-response")
     ;
 
@@ -97,7 +104,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
           .responseModel(ResponseMessage.class)
         .endResponseMessage()
         // Call the WebhookPingRoute
-        .to(DIRECT_PING_WEBHOOK)
+        .to(DIRECT_PING_WEBHOOK_ENDPOINT)
       
       // Handles the RHOAM Admin/Developer Portal webhook event and sends it to an AMQP queue
       .post("/webhook/amqpbridge")
@@ -123,12 +130,12 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
           .responseModel(ResponseMessage.class)
         .endResponseMessage()
         // call the SendToAMQPQueueRoute
-        .to(DIRECT_SEND_TO_AMQP_QUEUE)
+        .to(DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT)
 
     ;
 
     // Route that handles the webhook ping
-    from(DIRECT_PING_WEBHOOK)
+    from(DIRECT_PING_WEBHOOK_ENDPOINT)
 			.routeId("ping-webhook-route")
 			.setBody()
 				.method("responseMessageHelper", "generateOKResponseMessage()")
@@ -137,15 +144,14 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .marshal().json(JsonLibrary.Jackson, true).id("marshal-pingOK-responseMessage-to-json")
 		;
 
-    // Route that sends RHOAM Admin/Developer Portal webhook event to an AMQP queue
-    from(DIRECT_SEND_TO_AMQP_QUEUE)
-      .routeId("send-to-amqp-queue-route")
+    // Route that sends RHOAM Admin/Developer Portal webhook event to the Knative broker as a Cloud Event
+    // A kamelet will pickup the cloud event and send the event message to an external AMQP broker 
+    from(DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT)
+      .routeId("send-to-knative-broker-route")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - RHOAM Admin/Developer Portal received event: in.headers[${headers}] - in.body[${body}]")
       .removeHeaders("*", "breadcrumbId")
-      .setHeader("RHOAM_EVENT_TYPE").xpath("//event/type", String.class)
-      .setHeader("RHOAM_EVENT_ACTION").xpath("//event/action", String.class)
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending to RHOAM.WEBHOOK.EVENTS.QUEUE AMQP address...")
-      .to(ExchangePattern.InOnly, "amqp:queue:RHOAM.WEBHOOK.EVENTS.QUEUE")
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending it as a Cloud Event to the knative broker...")
+      .to(ExchangePattern.InOnly, KNATIVE_CE_RHOAM_EVENT_ENDPOINT)
 			.setBody()
 				.method("responseMessageHelper", "generateOKResponseMessage()")
 				.id("set-OK-reponseMessage")
@@ -160,7 +166,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 		 * <br>- CamelHttpResponseCode ({@link org.apache.camel.Exchange#HTTP_RESPONSE_CODE})
 		 * <br>- CamelHttpResponseText ({@link org.apache.camel.Exchange#HTTP_RESPONSE_TEXT})
 		 */
-		from(DIRECT_GENERATE_ERROR_MESSAGE)
+		from(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
       .routeId("generate-error-response-route")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]").id("log-errormessage-request")
       .filter(simple("${in.header.CamelHttpResponseCode} == null")) // Defaults to 500 HTTP Code
@@ -179,4 +185,45 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
     ;
 
   }
+
+  /**
+   * 
+   * Response Message helper bean 
+   *
+   */
+  @BindToRegistry("responseMessageHelper")
+  public static class ResponseMessageHelper {
+    
+    /**
+     * Generates an OK ResponseMessage
+     * @return OK ResponseMessage
+     */
+    public ResponseMessage generateOKResponseMessage() {
+      ResponseMessage responseMessage = new ResponseMessage();
+      responseMessage.setStatus(ResponseMessage.Status.OK);
+      return responseMessage;
+    }
+    
+    /**
+     * Generates a KO ResponseMessage
+     * @param erroCode
+     * @param errorDescription
+     * @param errorMessage
+     * @return KO ResponseMessage
+     */
+    public ResponseMessage generateKOResponseMessage(String errorCode, String errorDescription, String errorMessage) {
+      ResponseMessage responseMessage = new ResponseMessage();
+      ErrorMessageType errorMessageType = new ErrorMessageType();
+      errorMessageType.setCode(errorCode);
+      errorMessageType.setDescription(errorDescription);
+      errorMessageType.setMessage(errorMessage);
+
+      responseMessage.setStatus(ResponseMessage.Status.KO);
+      responseMessage.setError(errorMessageType);
+      
+      return responseMessage;
+    }
+
+  }
+
 }
