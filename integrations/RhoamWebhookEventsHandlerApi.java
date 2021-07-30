@@ -1,7 +1,8 @@
-// camel-k: language=java 
+// camel-k: language=java
 // camel-k: dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002
 // camel-k: dependency=github:jeannyil-camel-k-playground:camel-k-rhoam-webhook-handler-api:main-SNAPSHOT
-// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true 
+// camel-k: dependency=camel-direct
+// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true trait=knative.enabled=true
 // camel-k: resource=../resources/openapi.json
 
 import javax.ws.rs.core.MediaType;
