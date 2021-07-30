@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.jeannyil</groupId>
     <artifactId>message-models</artifactId>
-    <version>master-SNAPSHOT</version>
+    <version>main-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>RHOAM Webhook Events Handler API - Message Models</name>
     <description>API that handles RHOAM Admin/Developer Portals webhook events</description>
