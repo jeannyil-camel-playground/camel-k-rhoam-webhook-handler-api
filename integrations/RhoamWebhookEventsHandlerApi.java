@@ -1,4 +1,8 @@
-// camel-k: language=java dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002 dependency=mvn:io.github.jeannyil:message-models:1.0.0 trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true resource=../resources/openapi.json
+// camel-k: language=java 
+// camel-k: dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002 
+// camel-k: dependency=jitpack:com.github.jeanNyil:camel-k-rhoam-webhook-handler-api:master-SNAPSHOT
+// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true 
+// camel-k: resource=../resources/openapi.json
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
