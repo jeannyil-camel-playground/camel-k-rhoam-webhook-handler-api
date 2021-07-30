@@ -1,4 +1,6 @@
-# camel-k: language=yaml trait=prometheus.enabled=true trait=tracing.auto=true
+# camel-k: language=yaml property=file:../config/application.properties
+# camel-k: dependency=mvn:org.amqphub.quarkus:quarkus-qpid-jms
+# camel-k: trait=prometheus.enabled=true trait=tracing.auto=true
 
 # Write your routes here, for example:
 - from:
