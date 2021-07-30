@@ -4,7 +4,7 @@
     xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.jeannyil</groupId>
-    <artifactId>message-models</artifactId>
+    <artifactId>camel-k-rhoam-webhook-handler-api</artifactId>
     <version>main-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>RHOAM Webhook Events Handler API - Message Models</name>

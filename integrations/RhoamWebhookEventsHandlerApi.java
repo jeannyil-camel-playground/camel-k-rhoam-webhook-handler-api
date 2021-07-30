@@ -1,6 +1,6 @@
 // camel-k: language=java 
 // camel-k: dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002
-// camel-k: dependency=jitpack:com.github.jeannyil-camel-k-playground:camel-k-rhoam-webhook-handler-api:main-SNAPSHOT
+// camel-k: dependency=github:jeannyil-camel-k-playground:camel-k-rhoam-webhook-handler-api:main-SNAPSHOT
 // camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true 
 // camel-k: resource=../resources/openapi.json
 
