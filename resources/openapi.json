@@ -14,7 +14,7 @@
     },
     "servers": [
         {
-            "url": "http://rhoam-webhook-events-handler-api.apps.jeannyil.sandbox452.opentlc.com",
+            "url": "http://rhoam-webhook-events-handler-api.apps.jeannyil.sandbox430.opentlc.com",
             "description": "API Backend URL"
         }
     ],
