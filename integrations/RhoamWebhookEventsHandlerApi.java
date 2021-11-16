@@ -1,9 +1,11 @@
 // camel-k: language=java
+// camel-k: name=rhoam-webhook-events-handler-api
 // camel-k: dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002 
-// camel-k: dependency=camel-direct
-// camel-k: dependency=github:jeannyil-camel-k-playground:camel-k-rhoam-webhook-handler-api:main-SNAPSHOT
-// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.auto=true trait=knative.enabled=true
-// camel-k: resource=../resources/openapi.json
+// camel-k: dependency=camel-direct dependency=camel-amqp
+// camel-k: resource=file:../resources/openapi.json
+// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.enabled=true
+// camel-k: trait=route.tls-termination=edge
+// camel-k: config=secret:amqpbroker-connection-secret
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -29,7 +31,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
   public static final String DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT = "direct:generateErrorResponse";
 	public static final String DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT = "direct:sendToAMQPQueue";
 	public static final String DIRECT_PING_WEBHOOK_ENDPOINT = "direct:pingWebhook";
-  public static final String KNATIVE_CE_RHOAM_EVENT_ENDPOINT = "knative:event/rhoam.event";
+  public static final String AMQP_QUEUE_RHOAM_EVENT_ENDPOINT = "amqp:queue:RHOAM.WEBHOOK.EVENTS.QUEUE";
   
   @Override
   public void configure() throws Exception {
@@ -87,7 +89,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
           .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]").id("log-openapi-doc-request")
           .setHeader(Exchange.CONTENT_TYPE, constant("application/vnd.oai.openapi+json")).id("set-content-type")
           .setBody()
-            .constant("resource:classpath:resources/openapi.json")
+            .constant("resource:file:/etc/camel/resources/openapi.json")
             .id("setBody-for-openapi-document")
           .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-openapi-doc-response")
         .end()
@@ -156,7 +158,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - RHOAM Admin/Developer Portal received event: in.headers[${headers}] - in.body[${body}]")
       .removeHeaders("*", "breadcrumbId")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending it as a Cloud Event to the knative broker...")
-      .to(ExchangePattern.InOnly, KNATIVE_CE_RHOAM_EVENT_ENDPOINT)
+      .to(ExchangePattern.InOnly, AMQP_QUEUE_RHOAM_EVENT_ENDPOINT)
 			.setBody()
 				.method("responseMessageHelper", "generateOKResponseMessage()")
 				.id("set-OK-reponseMessage")
