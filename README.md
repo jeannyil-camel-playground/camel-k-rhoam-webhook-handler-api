@@ -179,33 +179,6 @@ The implemented Integration exposes the following RESTful service endpoints:
             }
             ```
 
-        - `KO` response:
-
-            ```zsh
-            echo 'PLAIN TEXT' | http -v POST $URL/webhook/amqpbridge content-type:application/xml
-            ```
-            ```zsh
-            [...]
-            HTTP/1.1 400 Bad Request
-            Access-Control-Allow-Headers: Origin, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers
-            Access-Control-Allow-Methods: GET, HEAD, POST, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATCH
-            Access-Control-Allow-Origin: *
-            Access-Control-Max-Age: 3600
-            Content-Type: application/json
-            Set-Cookie: 0d5acfcb0ca2b6f2520831b8d4bd4031=f3580c9af577adb49be04813506f5ec6; path=/; HttpOnly
-            breadcrumbId: 43EB8F0221CD24E-0000000000000003
-            transfer-encoding: chunked
-
-            {
-                "error": {
-                    "code": "400",
-                    "description": "Bad Request",
-                    "message": "org.apache.camel.TypeConversionException: Error during type conversion from type: java.lang.String to the required type: org.w3c.dom.Document with value PLAIN TEXT\n due to org.xml.sax.SAXParseException: Content is not allowed in prolog."
-                },
-                "status": "KO"
-            }
-            ```
-
 3. Test the `/openapi.json` endpoint
     ```zsh
     http -v $URL/openapi.json
