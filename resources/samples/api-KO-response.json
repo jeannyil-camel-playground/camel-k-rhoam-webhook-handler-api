@@ -1,0 +1,8 @@
+{
+    "status": "KO",
+    "error": {
+        "code": "400",
+        "description": "Bad Request",
+        "message": "org.apache.camel.TypeConversionException: Error during type conversion from type: java.lang.String to the required type: org.w3c.dom.Document with value PLAIN TEXT DATA\n due to org.xml.sax.SAXParseException: Content is not allowed in prolog."
+    }
+}

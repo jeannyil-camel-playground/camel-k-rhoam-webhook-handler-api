@@ -1,11 +1,14 @@
 // camel-k: language=java
 // camel-k: name=rhoam-webhook-events-handler-api
-// camel-k: dependency=mvn:javax.ws.rs:javax.ws.rs-api:2.1.1.redhat-00002 
-// camel-k: dependency=camel-direct dependency=camel-amqp
-// camel-k: resource=file:../resources/openapi.json
+// camel-k: dependency=camel:camel-quarkus-amqp 
+// camel-k: dependency=camel:camel-quarkus-direct
+// camel-k: open-api=../resources/api/openapi.json
+// camel-k: resource=file:../resources/api/openapi.json
+// camel-k: resource=file:../resources/map/generate-api-KO-response.adm
+// camel-k: resource=file:../resources/map/generate-api-OK-response.adm
 // camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.enabled=true
-// camel-k: trait=route.tls-termination=edge
 // camel-k: config=secret:amqpbroker-connection-secret
+// camel-k: property=api.resources.path=file:/etc/camel/resources
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -17,11 +20,6 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.TypeConversionException;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.apache.camel.model.rest.RestBindingMode;
-import org.apache.camel.model.rest.RestParamType;
-
-import io.github.jeannyil.beans.ErrorMessageType;
-import io.github.jeannyil.beans.ResponseMessage;
 
 // Exposes the RHOAM Webhook Events Handler API
 public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
@@ -43,7 +41,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .handled(true)
       .maximumRedeliveries(0)
       .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught exception: ${exception.stacktrace}").id("log-unexpected")
-      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT).id("generate-500-errorresponse")
+      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-unexpected-response")
     ;
 
@@ -55,24 +53,9 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
       .maximumRedeliveries(0)
       .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught TypeConversionException: ${exception.stacktrace}").id("log-400")
       .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(Response.Status.BAD_REQUEST.getStatusCode())) // 400 Http Code
-      .setProperty(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.BAD_REQUEST.getReasonPhrase())) // 400 Http Code Text
-      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT).id("generate-400-errorresponse")
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log400-response")
-    ;
-
-    /**
-		 * REST configuration with Camel Quarkus Platform HTTP component
-		 */
-		restConfiguration()
-      .component("platform-http")
-      .enableCORS(true)
-      .bindingMode(RestBindingMode.off) // RESTful responses will be explicitly marshaled for logging purposes
-      .dataFormatProperty("prettyPrint", "true")
-      .scheme("http")
-      .host("0.0.0.0")
-      .port("8080")
-      .contextPath("/")
-      .clientRequestValidation(true)
+      .setHeader(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.BAD_REQUEST.getReasonPhrase())) // 400 Http Code Text
+      .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]")
     ;
 
     /**
@@ -80,90 +63,41 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 		 */
 		rest().id("openapi-document-restapi")
       .produces(MediaType.APPLICATION_JSON)
-      
-      // Gets the OpenAPI document for this service
+      // Returns the OpenAPI document for this service
       .get("/openapi.json")
         .id("get-openapi-spec-route")
-        .description("Gets the OpenAPI document for this service in JSON format")
         .route()
-          .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]").id("log-openapi-doc-request")
-          .setHeader(Exchange.CONTENT_TYPE, constant("application/vnd.oai.openapi+json")).id("set-content-type")
+          .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]")
+          .setHeader(Exchange.CONTENT_TYPE, constant("application/vnd.oai.openapi+json"))
           .setBody()
-            .constant("resource:file:/etc/camel/resources/openapi.json")
-            .id("setBody-for-openapi-document")
-          .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-openapi-doc-response")
+            .constant("resource:{{api.resources.path}}/openapi.json")
+          .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]")
         .end()
     ;
   
-    /**
-     * REST endpoint for the RHOAM Webhook Events Handler API
-     */
-    rest().id("rhoam-webhook-events-handler-api")
-        
-      // Handles RHOAM webhook ping
-      .get("/webhook/amqpbridge")
-        .id("webhook-amqpbridge-ping-route")
-        .description("Handles RHOAM webhook ping")
-        .produces(MediaType.APPLICATION_JSON)
-        .responseMessage()
-          .code(Response.Status.OK.getStatusCode())
-          .message(Response.Status.OK.getReasonPhrase())
-          .responseModel(ResponseMessage.class)
-        .endResponseMessage()
-        // Call the WebhookPingRoute
-        .to(DIRECT_PING_WEBHOOK_ENDPOINT)
-      
-      // Handles the RHOAM Admin/Developer Portal webhook event and sends it to an AMQP queue
-      .post("/webhook/amqpbridge")
-        .id("webhook-amqpbridge-handler-route")
-        .consumes(MediaType.WILDCARD)
-        .produces(MediaType.APPLICATION_JSON)
-        .description("Sends RHOAM Admin/Developer Portal webhook event to an AMQP queue")
-        .param()
-          .name("body")
-          .type(RestParamType.body)
-          .description("RHOAM Admin/Developer Portal XML event")
-          .dataType("string")
-          .required(true)
-        .endParam()
-        .responseMessage()
-          .code(Response.Status.OK.getStatusCode())
-          .message(Response.Status.OK.getReasonPhrase())
-          .responseModel(ResponseMessage.class)
-        .endResponseMessage()
-        .responseMessage()
-          .code(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode())
-          .message(Response.Status.INTERNAL_SERVER_ERROR.getReasonPhrase())
-          .responseModel(ResponseMessage.class)
-        .endResponseMessage()
-        // call the SendToAMQPQueueRoute
-        .to(DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT)
-
-    ;
-
+    
     // Route that handles the webhook ping
     from(DIRECT_PING_WEBHOOK_ENDPOINT)
 			.routeId("ping-webhook-route")
-			.setBody()
-				.method("responseMessageHelper", "generateOKResponseMessage()")
-				.id("set-pingOK-reponseMessage")
-      .end()
-      .marshal().json(JsonLibrary.Jackson, true).id("marshal-pingOK-responseMessage-to-json")
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Received a ping event: in.headers[${headers}] - in.body[${body}]")
+			// Generate the error response message using atlasmap
+      .to("atlasmap:{{api.resources.path}}/generate-api-OK-response.adm")
+      .setHeader(Exchange.CONTENT_TYPE, constant(MediaType.APPLICATION_JSON))
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - pingWebhook response: headers:[${headers}] - body:[${body}]")
 		;
 
-    // Route that sends RHOAM Admin/Developer Portal webhook event to the Knative broker as a Cloud Event
-    // A kamelet will pickup the cloud event and send the event message to an external AMQP broker 
+    // Route that sends RHOAM Admin/Developer Portal webhook event to an AMQP broker 
     from(DIRECT_SEND_TO_AMQP_QUEUE_ENDPOINT)
-      .routeId("send-to-knative-broker-route")
+      .routeId("send-to-amqp-queue-route")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - RHOAM Admin/Developer Portal received event: in.headers[${headers}] - in.body[${body}]")
       .removeHeaders("*", "breadcrumbId")
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending it as a Cloud Event to the knative broker...")
+      // .setHeader("RHOAM_EVENT_TYPE").xpath("//event/type", String.class)
+      // .setHeader("RHOAM_EVENT_ACTION").xpath("//event/action", String.class)
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Sending to RHOAM.WEBHOOK.EVENTS.QUEUE AMQP address...")
       .to(ExchangePattern.InOnly, AMQP_QUEUE_RHOAM_EVENT_ENDPOINT)
-			.setBody()
-				.method("responseMessageHelper", "generateOKResponseMessage()")
-				.id("set-OK-reponseMessage")
-      .end()
-      .marshal().json(JsonLibrary.Jackson, true).id("marshal-OK-responseMessage-to-json")
+      // Generate the error response message using atlasmap
+      .to("atlasmap:{{api.resources.path}}/generate-api-OK-response.adm")
+      .setHeader(Exchange.CONTENT_TYPE, constant(MediaType.APPLICATION_JSON))
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - sendToAMQPQueue response: headers:[${headers}] - body:[${body}]")
     ;
 
@@ -175,61 +109,17 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 		 */
 		from(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
       .routeId("generate-error-response-route")
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]").id("log-errormessage-request")
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - IN: headers:[${headers}] - body:[${body}]")
       .filter(simple("${in.header.CamelHttpResponseCode} == null")) // Defaults to 500 HTTP Code
-        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode())).id("set-500-http-code")
-        .setHeader(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.INTERNAL_SERVER_ERROR.getReasonPhrase())).id("set-500-http-reason")
+        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()))
+        .setHeader(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.INTERNAL_SERVER_ERROR.getReasonPhrase()))
       .end() // end filter
-      .setHeader(Exchange.CONTENT_TYPE, constant(MediaType.APPLICATION_JSON)).id("set-json-content-type")
-      .setBody()
-        .method("responseMessageHelper", 
-            "generateKOResponseMessage(${headers.CamelHttpResponseCode}, ${headers.CamelHttpResponseText}, ${exception})")
-        .id("set-errorresponse-object")
-      .end()
-      .marshal().json(JsonLibrary.Jackson, true).id("marshal-errorresponse-to-json")
-      .convertBodyTo(String.class).id("convert-errorresponse-to-string")
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-errorresponse")
+      .setHeader("errorMessage", simple("${exception}"))
+      // Generate the error response message using atlasmap
+      .to("atlasmap:{{api.resources.path}}/generate-api-KO-response.adm")
+      .setHeader(Exchange.CONTENT_TYPE, constant(MediaType.APPLICATION_JSON))
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]")
     ;
-
-  }
-
-  /**
-   * 
-   * Response Message helper bean 
-   *
-   */
-  @BindToRegistry("responseMessageHelper")
-  public static class ResponseMessageHelper {
-    
-    /**
-     * Generates an OK ResponseMessage
-     * @return OK ResponseMessage
-     */
-    public ResponseMessage generateOKResponseMessage() {
-      ResponseMessage responseMessage = new ResponseMessage();
-      responseMessage.setStatus(ResponseMessage.Status.OK);
-      return responseMessage;
-    }
-    
-    /**
-     * Generates a KO ResponseMessage
-     * @param erroCode
-     * @param errorDescription
-     * @param errorMessage
-     * @return KO ResponseMessage
-     */
-    public ResponseMessage generateKOResponseMessage(String errorCode, String errorDescription, String errorMessage) {
-      ResponseMessage responseMessage = new ResponseMessage();
-      ErrorMessageType errorMessageType = new ErrorMessageType();
-      errorMessageType.setCode(errorCode);
-      errorMessageType.setDescription(errorDescription);
-      errorMessageType.setMessage(errorMessage);
-
-      responseMessage.setStatus(ResponseMessage.Status.KO);
-      responseMessage.setError(errorMessageType);
-      
-      return responseMessage;
-    }
 
   }
 
