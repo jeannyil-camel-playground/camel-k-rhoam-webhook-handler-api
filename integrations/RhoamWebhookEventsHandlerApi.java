@@ -37,7 +37,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
     /**
 		 * Catch unexpected exceptions
 		 */
-		onException()
+		onException(java.lang.Exception.class)
       .handled(true)
       .maximumRedeliveries(0)
       .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught exception: ${exception.stacktrace}").id("log-unexpected")
