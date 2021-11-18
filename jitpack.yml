@@ -1,5 +1,0 @@
-jdk:
-  - openjdk11
-install:
-  - echo "Building the RHOAM Webhook Events Handler API - Message Models..."
-  - mvn clean install -f ./message-models/pom.xml
