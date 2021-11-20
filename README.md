@@ -83,12 +83,12 @@ The implemented Integration exposes the following RESTful service endpoints:
         apiVersion: jaegertracing.io/v1
         kind: Jaeger
         metadata:
-        name: jaeger-all-in-one-inmemory
+            name: jaeger-all-in-one-inmemory
         spec:
-        allInOne:
-            options:
-            log-level: info
-        strategy: allInOne
+            allInOne:
+                options:
+                log-level: info
+            strategy: allInOne
         EOF
         ```
 
