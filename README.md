@@ -22,7 +22,7 @@ The implemented Integration exposes the following RESTful service endpoints:
 3. Install, via OLM, the `Red Hat Integration Camel-K` operator in the `camel-k-integrations` namespace
 
     1. Create the `camel-k-integrations` operator group
-        ```
+        ```zsh
         oc create --save-config -f - <<EOF
         apiVersion: operators.coreos.com/v1
         kind: OperatorGroup
@@ -35,7 +35,7 @@ The implemented Integration exposes the following RESTful service endpoints:
         EOF
         ```
     2. Create the `Red Hat Integration - Camel-K` subscription 
-        ```
+        ```zsh
         oc create --save-config -f - <<EOF
         apiVersion: operators.coreos.com/v1alpha1
         kind: Subscription
@@ -51,10 +51,48 @@ The implemented Integration exposes the following RESTful service endpoints:
         EOF
         ```
     3. Verify the successful installation of the `Red Hat Integration - Camel-K` operator
-        ```
+        ```zsh
         watch oc get sub,csv,installPlan
         ```
-4. Create the `amqpbroker-connection-secret` containing the _QUARKUS QPID JMS_ [configuration options](https://github.com/amqphub/quarkus-qpid-jms#configuration) from the [`amqpbroker.properties`](config/amqpbroker.properties) file. These options are leveraged by the _Camel Quarkus AMQP_ extension to connect to an AMQP broker. 
+        
+4. Create an `allInOne` Jaeger instance.
+    1. **IF NOT ALREADY INSTALLED**:
+        1. Install, via OLM, the `Red Hat OpenShift distributed tracing platform` (Jaeger) operator with an `AllNamespaces` scope. :warning: Needs `cluster-admin` privileges
+            ```zsh
+            oc create --save-config -f - <<EOF
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+                name: jaeger-product
+                namespace: openshift-operators
+            spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: jaeger-product
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+            EOF
+            ```
+        2. Verify the successful installation of the `Red Hat OpenShift distributed tracing platform` operator
+        ```zsh
+        watch oc get sub,csv
+        ```
+    2. Create the `allInOne` Jaeger instance.
+        ```zsh
+        oc create --save-config -f - <<EOF
+        apiVersion: jaegertracing.io/v1
+        kind: Jaeger
+        metadata:
+        name: jaeger-all-in-one-inmemory
+        spec:
+        allInOne:
+            options:
+            log-level: info
+        strategy: allInOne
+        EOF
+        ```
+
+5. Create the `amqpbroker-connection-secret` containing the _QUARKUS QPID JMS_ [configuration options](https://github.com/amqphub/quarkus-qpid-jms#configuration) from the [`amqpbroker.properties`](config/amqpbroker.properties) file. These options are leveraged by the _Camel Quarkus AMQP_ extension to connect to an AMQP broker. 
 
     :warning: _Replace values with your AMQP broker environment in the [`amqpbroker.properties`](config/amqpbroker.properties) file_.
     ```zsh
