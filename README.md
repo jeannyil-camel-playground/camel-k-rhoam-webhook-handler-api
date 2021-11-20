@@ -74,9 +74,9 @@ The implemented Integration exposes the following RESTful service endpoints:
             EOF
             ```
         2. Verify the successful installation of the `Red Hat OpenShift distributed tracing platform` operator
-        ```zsh
-        watch oc get sub,csv
-        ```
+            ```zsh
+            watch oc get sub,csv
+            ```
     2. Create the `allInOne` Jaeger instance.
         ```zsh
         oc create --save-config -f - <<EOF
