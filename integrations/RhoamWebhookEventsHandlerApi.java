@@ -6,7 +6,7 @@
 // camel-k: resource=file:../resources/api/openapi.json
 // camel-k: resource=file:../resources/map/generate-api-KO-response.adm
 // camel-k: resource=file:../resources/map/generate-api-OK-response.adm
-// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.enabled=true
+// camel-k: trait=prometheus.enabled=true trait=3scale.enabled=true trait=tracing.enabled=true trait=tracing.
 // camel-k: config=secret:amqpbroker-connection-secret
 // camel-k: property=api.resources.path=file:/etc/camel/resources
 
@@ -40,9 +40,9 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 		onException(java.lang.Exception.class)
       .handled(true)
       .maximumRedeliveries(0)
-      .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught exception: ${exception.stacktrace}").id("log-unexpected")
+      .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught exception: ${exception.stacktrace}")
       .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
-      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]").id("log-unexpected-response")
+      .log(LoggingLevel.INFO, logName, ">>> ${routeId} - OUT: headers:[${headers}] - body:[${body}]")
     ;
 
     /**
@@ -51,7 +51,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
 		onException(TypeConversionException.class)
       .handled(true)
       .maximumRedeliveries(0)
-      .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught TypeConversionException: ${exception.stacktrace}").id("log-400")
+      .log(LoggingLevel.ERROR, logName, ">>> ${routeId} - Caught TypeConversionException: ${exception.stacktrace}")
       .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(Response.Status.BAD_REQUEST.getStatusCode())) // 400 Http Code
       .setHeader(Exchange.HTTP_RESPONSE_TEXT, constant(Response.Status.BAD_REQUEST.getReasonPhrase())) // 400 Http Code Text
       .to(DIRECT_GENERATE_ERROR_MESSAGE_ENDPOINT)
@@ -80,7 +80,7 @@ public class RhoamWebhookEventsHandlerApi extends RouteBuilder {
     from(DIRECT_PING_WEBHOOK_ENDPOINT)
 			.routeId("ping-webhook-route")
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - Received a ping event: in.headers[${headers}] - in.body[${body}]")
-			// Generate the error response message using atlasmap
+			// Generate the response message using atlasmap
       .to("atlasmap:{{api.resources.path}}/generate-api-OK-response.adm")
       .setHeader(Exchange.CONTENT_TYPE, constant(MediaType.APPLICATION_JSON))
       .log(LoggingLevel.INFO, logName, ">>> ${routeId} - pingWebhook response: headers:[${headers}] - body:[${body}]")
